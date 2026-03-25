@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "file=$(echo $CLAUDE_TOOL_INPUT | grep -o '\"file_path\":\\s*\"[^\"]*\"' | head -1 | sed 's/.*\"\\([^\"]*\\)\"/\\1/'); if [ -n \"$file\" ] && echo \"$file\" | grep -q '\\.py$'; then if command -v ruff >/dev/null 2>&1; then ruff check --fix \"$file\" 2>/dev/null; fi; if command -v black >/dev/null 2>&1; then black -q \"$file\" 2>/dev/null; fi; fi"
+          }
+        ],
+        "description": "Auto-format Python files with ruff and black after edits"
+      },
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "file=$(echo $CLAUDE_TOOL_INPUT | grep -o '\"file_path\":\\s*\"[^\"]*\"' | head -1 | sed 's/.*\"\\([^\"]*\\)\"/\\1/'); if [ -n \"$file\" ] && echo \"$file\" | grep -q '\\.py$'; then if command -v mypy >/dev/null 2>&1; then mypy --no-error-summary \"$file\" 2>/dev/null | head -20; fi; fi",
+            "async": true,
+            "timeout": 15
+          }
+        ],
+        "description": "Run mypy type checking after editing Python files"
+      },
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "file=$(echo $CLAUDE_TOOL_INPUT | grep -o '\"file_path\":\\s*\"[^\"]*\"' | head -1 | sed 's/.*\"\\([^\"]*\\)\"/\\1/'); if [ -n \"$file\" ] && echo \"$file\" | grep -q '\\.py$'; then if grep -n 'print(' \"$file\" 2>/dev/null | grep -v '#.*print' | head -5; then echo '[WARNING] print() statements detected - consider using logging module'; fi; fi"
+          }
+        ],
+        "description": "Warn about print() statements in edited Python files"
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "changed=$(git diff --name-only 2>/dev/null | grep '\\.py$' || true); if [ -n \"$changed\" ]; then for f in $changed; do if grep -n 'print(' \"$f\" 2>/dev/null | grep -v '#.*print' | head -3; then echo \"[WARNING] print() in $f - use logging\"; fi; if grep -n 'import pdb' \"$f\" 2>/dev/null; then echo \"[WARNING] pdb import in $f - remove before commit\"; fi; if grep -n 'breakpoint()' \"$f\" 2>/dev/null; then echo \"[WARNING] breakpoint() in $f - remove before commit\"; fi; done; fi"
+          }
+        ],
+        "description": "Check for debug statements in modified Python files"
+      }
+    ]
+  }
+}
